@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use tokio::sync::mpsc::unbounded_channel;
+use tokio::{sync::{broadcast, mpsc::unbounded_channel}, task::JoinHandle};
 
 use crate::stages::{
     event::Dispatcher,
@@ -23,7 +23,7 @@ impl StageRegistry {
         self
     }
 
-    pub fn build(self) -> Dispatcher {
+    pub fn build(self) -> (Dispatcher, JoinHandle<()>) {
         start_stage_router(self.stages)
     }
 }
@@ -36,21 +36,31 @@ impl Default for StageRegistry {
 
 fn start_stage_router(
     stages: HashMap<StageId, Box<dyn Stage + Send + Sync>>,
-) -> Dispatcher {
+) -> (Dispatcher, JoinHandle<()>) {
     let (tx, mut rx) = unbounded_channel();
-    let dispatcher = Dispatcher { tx: tx.clone() };
+    let (closed, mut closed_rx) = broadcast::channel(1);
+    let dispatcher = Dispatcher::new(tx, closed);
 
     let stages = Arc::new(stages);
     let tk_stages = stages.clone();
     let tk_dispatcher = dispatcher.clone();
+    
+    let handle = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                Some(event) = rx.recv() => {
+                    if let Some(stage) = tk_stages.get(&event.stage) {
+                        stage.process(tk_dispatcher.clone(), event.resp).await;
+                    }
+                    tk_dispatcher.complete();
+                }
 
-    tokio::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            if let Some(stage) = tk_stages.get(&event.stage) {
-                stage.process(tk_dispatcher.clone(), event.resp).await;
+                _ = closed_rx.recv() => {
+                    break;
+                }
             }
         }
     });
 
-    dispatcher
+    (dispatcher, handle)
 }

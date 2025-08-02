@@ -25,7 +25,8 @@ impl Stage for SaveFileStage {
                         return;
                     }
                 }
-
+                
+                println!("[SaveFile] salvado o arquivo {:?}", &dir);
                 if let Err(e) = fs::write(&dir, &body) {
                     eprintln!("Erro ao salvar o arquivo {:?}: {}", dir, e);
                 }

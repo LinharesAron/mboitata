@@ -2,10 +2,7 @@ use std::{pin::Pin, sync::Arc};
 
 use http_body_util::combinators::BoxBody;
 use hyper::{
-    Request, Response,
-    body::{Bytes, Incoming},
-    http,
-    upgrade::Upgraded,
+    body::{Bytes, Incoming}, http, upgrade::Upgraded, Request, Response, StatusCode
 };
 use hyper_util::rt::TokioIo;
 use pki_types::ServerName;
@@ -15,8 +12,7 @@ use tokio_rustls::{TlsAcceptor, TlsConnector};
 
 use crate::{
     proxy::{
-        Intercept, InterceptService, ServerBuilder, certs::CertificateManager, empty,
-        extract_host_port, full, handle_response,
+        certs::CertificateManager, create_response, empty, extract_host_port, full, handle_response, Intercept, InterceptService, ServerBuilder
     },
     stages::intercepted::InterceptedResponse,
 };
@@ -99,14 +95,21 @@ impl Intercept for HttpsIntercept {
                 match extract_host_port(&req, Some(SCHEME)) {
                     Ok((h, p)) => (h, p),
                     Err(e) => {
-                        eprintln!("Erro ao extrair host/port: {:?}", e);
-                        return Ok(Response::new(empty()));
+                        let msg = format!("Erro ao extrair host/port: {:?}", e);
+                        eprintln!("❌ {msg}");
+                        return Ok(create_response(msg, StatusCode::BAD_REQUEST));
                     }
                 };
 
             let server_name = ServerName::try_from(host.clone()).unwrap();
-
-            let stream = TcpStream::connect((host.clone(), port)).await.unwrap();
+            let stream = match TcpStream::connect((host.clone(), port)).await {
+                Ok(s) => s,
+                Err(e) => {
+                    let msg = format!("Erro ao connectar ao servidor host/port: {:?}", e);
+                    eprintln!("❌ {msg}");
+                    return Ok(create_response(msg, StatusCode::BAD_REQUEST));
+                }
+            };
 
             let root_store = RootCertStore {
                 roots: webpki_roots::TLS_SERVER_ROOTS.into(),

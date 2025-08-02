@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io::{self, BufRead}, path::PathBuf};
 
 use clap::Parser;
 use url::Url;
@@ -12,8 +12,8 @@ use crate::allow_list::AllowList;
     about = "HTTP(S) MITM proxy para capturar e analisar JS/JS.map"
 )]
 pub struct Config {
-    #[arg(short, long, value_delimiter = ',', required = false)]
-    pub urls: Vec<String>,
+    #[arg(short, long, value_delimiter = ',')]
+    pub urls: Option<Vec<String>>,
 
     #[arg(short, long, env = "MBOITATA_PORT", default_value = "8085")]
     pub port: String,
@@ -32,13 +32,32 @@ pub struct Config {
 }
 
 pub fn load() -> (Config, AllowList) {
-    let config = Config::parse();
+    let mut config = Config::parse();
 
     let mut allow_list = config.allow_list.clone();
+    
+    let mut urls: Vec<String> = vec![];
 
-    if !config.urls.is_empty() {
+    if let Some(input_urls) = &config.urls {
+        if input_urls.len() == 1 && input_urls[0] == "-" {
+            println!("[INFO] Lendo URLs do stdin (modo Boitatá 🐍🔥)");
+            let stdin = io::stdin().lock();
+            for line in stdin.lines().flatten() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    urls.push(trimmed.to_string());
+                }
+            }
+        } else {
+            urls = input_urls.clone();
+        }
+    }
+
+    config.urls = Some(urls.clone());
+
+    if !urls.is_empty() {
         println!("[INFO] Rodando crawler nas URLs fornecidas...");
-        let domains = extract_domains_from_urls(&config.urls);
+        let domains = extract_domains_from_urls(&urls);
         println!("[INFO] Domínios extraídos do crawler: {:?}", domains);
 
         for domain in domains {

@@ -17,7 +17,7 @@ use hyper_util::rt::TokioIo;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::TcpListener,
-    sync::mpsc::Sender,
+    sync::{broadcast, mpsc::Sender},
 };
 
 use crate::proxy::http::HttpIntercept;
@@ -53,42 +53,58 @@ impl<I: Intercept> Service<I::Request> for InterceptService<I> {
 
 pub async fn start_proxy(
     tx: Sender<InterceptedResponse>,
+    mut kill_signal: broadcast::Receiver<()>,
     cert_manager: Arc<CertificateManager>,
-    port: &str,
+    proxy_server: &str,
 ) -> anyhow::Result<()> {
-    println!("Starting listener on 0.0.0.0:{port}");
+    println!("Starting listener on {proxy_server}");
 
-    let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    let listener = TcpListener::bind(proxy_server).await?;
 
     loop {
-        let (stream, _) = listener.accept().await?;
-        let io = TokioIo::new(stream);
-
-        let https_intercept = HttpsIntercept {
-            tx: tx.clone(),
-            cert_manager: cert_manager.clone(),
-        };
-
-        let http_intercept = HttpIntercept {
-            tx: tx.clone(),
-            upgraded: https_intercept.clone(),
-        };
-
-        let http_service = InterceptService {
-            base: http_intercept.clone(),
-        };
-
-        tokio::task::spawn(async move {
-            if let Err(err) = ServerBuilder::new()
-                .preserve_header_case(true)
-                .title_case_headers(true)
-                .serve_connection(io, http_service)
-                .with_upgrades()
-                .await
-            {
-                println!("Failed to serve connection: {:?}", err);
+        tokio::select! {
+            _ = kill_signal.recv() => {
+                println!("🛑 Proxy recebeu kill. Encerrando listener...");
+                return Ok(());
             }
-        });
+            res = listener.accept() => {
+                match res {
+                    Ok((stream, _)) => {
+                        let io = TokioIo::new(stream);
+
+                        let https_intercept = HttpsIntercept {
+                            tx: tx.clone(),
+                            cert_manager: cert_manager.clone(),
+                        };
+
+                        let http_intercept = HttpIntercept {
+                            tx: tx.clone(),
+                            upgraded: https_intercept.clone(),
+                        };
+
+                        let http_service = InterceptService {
+                            base: http_intercept.clone(),
+                        };
+
+                        tokio::task::spawn(async move {
+                            if let Err(err) = ServerBuilder::new()
+                                .preserve_header_case(true)
+                                .title_case_headers(true)
+                                .serve_connection(io, http_service)
+                                .with_upgrades()
+                                .await
+                            {
+                                println!("Failed to serve connection: {:?}", err);
+                            }
+                        });
+                    }
+
+                    Err(err) => {
+                        eprintln!("Erro ao aceitar conexão: {:?}", err);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -107,6 +123,15 @@ fn rebuild_response(
     }
 
     builder.body(full(body)).unwrap()
+}
+
+fn create_response(
+    msg: String,
+    status_code: StatusCode,
+) -> Response<BoxBody<hyper::body::Bytes, hyper::Error>> {
+    let mut resp = Response::new(full(msg));
+    *resp.status_mut() = status_code;
+    resp
 }
 
 fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, hyper::Error> {

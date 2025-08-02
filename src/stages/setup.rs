@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use tokio::task::JoinHandle;
+
 use crate::{
     allow_list::AllowList,
     stages::{
@@ -7,7 +9,7 @@ use crate::{
     },
 };
 
-pub fn initialize_stages(allow_list: AllowList, output: PathBuf) -> Dispatcher {
+pub fn initialize_stages(allow_list: AllowList, output: PathBuf) -> (Dispatcher, JoinHandle<()>) {
     StageRegistry::default()
         .register(
             StageId::Filter,

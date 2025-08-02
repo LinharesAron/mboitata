@@ -1,48 +1,104 @@
-# 🔥 Mboîtatá - The Blazing Sentinel of the Web
+# Mboî Tatá 🔥🐍
 
-**Mboîtatá** is a handcrafted proxy written in 🦀 Rust, forged with the flames of Brazilian folklore. Its purpose burns bright: to intercept and collect sensitive and strategic web artifacts like `.js`, `.map`, backend URLs, keys, and other hidden treasures from HTTP and HTTPS traffic.
-
-> ⚠️ This is an early-stage project, built as a learning experience. Some flames still flicker, but it already packs enough heat to scorch some bugs! 🌶️
+**Mboî Tatá** is a modular tool for intercepting, analyzing, and extracting `.js`, `.map`, and sensitive data from HTTP(S) traffic. Inspired by asynchronous pipelines and a stage-based architecture, it enables flexible, secure, and extensible operations.
 
 ---
 
-## 🔍 Purpose
+## 🔧 Features
 
-To assist in collecting valuable data during web application reconnaissance. Mboîtatá intercepts both HTTP and HTTPS requests and responses, saving useful files that often reveal:
-
-* JavaScript source code
-* Debug `.map` files
-* Internal URLs and endpoints
-* Secrets, API keys, tokens
-* Internal configurations (`.env`, `.conf`, etc.)
+* HTTP/S MITM Proxy with self-signed TLS support.
+* Captures JavaScript and `.map` files for source map analysis.
+* Asynchronous dispatcher with inflight event control and graceful shutdown.
+* Optional automated browsing with headless Chrome.
+* Scope control via allowlist or input files.
+* Modular architecture based on stages.
 
 ---
 
-## 🔧 How to Use
+## ⚖️ Architecture
 
-```bash
-cargo run
+```text
+InterceptedResponse
+     ↓
+ [FilterStage] → [JsSaveStage] → [MapStage] → [ScanStage]
+     ↓
+ Dispatcher coordinates events between stages.
 ```
 
-The tool is still in its early stage, but it already supports:
+---
 
-* Starting a basic HTTP proxy
-* Saving files based on their extension
-* Preparing the structure for more advanced analysis stages
+## 🚀 How to Use
+
+### Installation
+
+```bash
+cargo build --release
+```
+
+### Basic Execution
+
+```bash
+cargo run -- --port 8085 --urls urls.txt --allowlist example.com
+```
+
+### Execution with stdin
+
+```bash
+cat urls.txt | cargo run -- --urls -
+```
+
+### Available Parameters
+
+```bash
+--urls           List of URLs for the browser (can use '-')
+--allowlist      Allowed domains for interception
+--port           Proxy port (default: 8085)
+--output         Output folder (default: ./output)
+--certs          TLS certificate folder (default: ./certs)
+```
 
 ---
 
-## 🔥 Inspiration
+## ⚙️ Dispatcher and Graceful Shutdown
 
-> *"I am the fire that watches in the dark. No secret escapes my burning gaze."*
+* The `Dispatcher` is the core component that:
 
-Inspired by Boitatá — the fiery serpent guardian of the forests — this project brings the strength and mystique of Brazilian folklore into the world of offensive cybersecurity.
+  * Coordinates events between stages.
+  * Tracks how many events are being processed (`inflight`).
+  * Uses `Notify` to await completion before shutdown.
+  * Signals shutdown using a `broadcast` channel.
 
 ---
 
-## ⚠️ Disclaimer
+## 🔍 Internal Details
 
-This project is intended for educational use and authorized environments only. Unauthorized use against systems without permission is illegal and unethical.
+* URLs can be passed via `--urls` or `stdin`, with automatic domain parsing into the allowlist.
+* If no filter is provided, the proxy intercepts everything.
+* The stage system can be extended by implementing the `Stage` trait.
+
+---
+
+## 📁 Example Configuration Code
+
+```rust
+let (config, allowlist) = config::load();
+let (dispatcher, stage_handle) = StageRegistry::default()
+    .register(StageId::Filter, Box::new(FilterStage))
+    .register(StageId::JsSave, Box::new(JsSaveStage))
+    .build();
+```
+
+---
+
+## 📚 Etymology
+
+**Mboî Tatá** comes from Tupi, meaning "fire serpent" — a mythological creature that burns the trails it passes. This tool follows that spirit: silent, powerful, and destroyer of hidden vulnerabilities.
+
+---
+
+## 🚫 Legal Notice
+
+This tool is intended for educational and Red Team use in controlled environments. Misuse may be illegal.
 
 ---
 
