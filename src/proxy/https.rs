@@ -14,7 +14,7 @@ use crate::{
     proxy::{
         certs::CertificateManager, create_response, empty, extract_host_port, full, handle_response, Intercept, InterceptService, ServerBuilder
     },
-    stages::intercepted::InterceptedResponse,
+    analyzer::intercepted::InterceptedResponse,
 };
 
 #[derive(Debug, Clone)]

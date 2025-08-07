@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::stages::{event::Dispatcher, intercepted::InterceptedResponse};
+use crate::analyzer::{event::Dispatcher, intercepted::InterceptedResponse};
 
 #[async_trait]
 pub trait Stage: Send + Sync {
@@ -13,4 +13,5 @@ pub enum StageId {
     Map,
     SaveFile,
     Scan,
+    JsScan
 }

@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::{sync::{broadcast, mpsc::unbounded_channel}, task::JoinHandle};
 
-use crate::stages::{
+use crate::analyzer::{
     event::Dispatcher,
     stage::{Stage, StageId},
 };

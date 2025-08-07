@@ -26,3 +26,8 @@ sanitize-filename = "0.6.0"
 sha2 = "0.10.9"
 hex = "0.4.3"
 headless_chrome = {git = "https://github.com/rust-headless-chrome/rust-headless-chrome", features = ["fetch"]}
+swc_common = "14.0.2"
+swc_ecma_ast = "14.0.0"
+swc_ecma_parser = "22.0.3"
+swc_ecma_visit = "14.0.0"
+dirs = "6.0.0"

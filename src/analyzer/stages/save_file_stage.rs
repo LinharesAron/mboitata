@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use async_trait::async_trait;
 
-use crate::stages::{event::Dispatcher, intercepted::InterceptedResponse, stage::Stage};
+use crate::analyzer::{event::Dispatcher, intercepted::InterceptedResponse, stage::Stage};
 
 pub struct SaveFileStage {
     output_dir: PathBuf

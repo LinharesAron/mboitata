@@ -1,15 +1,13 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::stages::{
+use crate::analyzer::{
     event::Dispatcher,
     intercepted::InterceptedResponse,
     stage::{Stage, StageId},
+    stages::utils::file_name,
 };
 use async_trait::async_trait;
-use hex::encode;
 use regex::Regex;
-use sha2::Sha256;
-use sha2::Digest;
 
 pub struct ScanStage;
 
@@ -31,18 +29,14 @@ impl Stage for ScanStage {
             )
             .unwrap();
             let url_regex = Regex::new(r#"https?://[^\s"'<>]+"#).unwrap();
-            let env_regex = Regex::new(
-                r#"(?m)^var.+?=.*NODE_ENV.+?$"#
-            ).unwrap();
 
-            let mut findings: HashMap<&str, Vec<String>> = HashMap::new();
+            let mut findings: HashMap<&str, HashSet<String>> = HashMap::new();
 
             for (label, regex) in &[
                 ("JWT", token_regex),
                 ("Bearer Token", bearer_regex),
                 ("API Key", api_key_regex),
                 ("URL", url_regex),
-                ("NODE_ENV", env_regex)
             ] {
                 for mat in regex.find_iter(body.as_str()) {
                     println!(
@@ -55,25 +49,29 @@ impl Stage for ScanStage {
                     findings
                         .entry(label)
                         .or_default()
-                        .push(mat.as_str().to_string());
+                        .insert(mat.as_str().to_string());
                 }
             }
 
             let scheme = resp.scheme.clone();
             let host = resp.host.clone();
-            let path = hash(&resp.path);
+            let path = file_name(&resp.path);
+
             for (label, items) in findings {
                 if items.is_empty() {
                     continue;
                 }
 
-                let content = items.join("\n");
+                let mut v = items.iter().cloned().collect::<Vec<String>>();
+                v.sort();
+
+                let content = v.join("\n");
                 dispatcher.emit(
                     StageId::SaveFile,
                     InterceptedResponse {
                         scheme: scheme.clone(),
                         host: host.clone(),
-                        path: format!("findings/{}/{}", &path[..8], label),
+                        path: format!("findings/{}/{}", path, label),
                         content_encoding: "identity".into(),
                         content_type: "".into(),
                         body: content.as_bytes().to_vec(),
@@ -82,11 +80,4 @@ impl Stage for ScanStage {
             }
         }
     }
-}
-
-fn hash(path: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(path.as_bytes());
-    let result = hasher.finalize();
-    encode(result)
 }

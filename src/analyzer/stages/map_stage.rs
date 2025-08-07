@@ -4,7 +4,7 @@ use regex::Regex;
 use reqwest::Client;
 use sourcemap::{DecodedMap, decode_slice};
 
-use crate::stages::{
+use crate::analyzer::{
     event::Dispatcher,
     intercepted::InterceptedResponse,
     stage::{Stage, StageId},
@@ -69,7 +69,8 @@ impl Stage for MapStage {
             }
 
             dispatcher.emit(StageId::SaveFile, resp.clone());
-            dispatcher.emit(StageId::Scan, resp);
+            dispatcher.emit(StageId::Scan, resp.clone());
+            dispatcher.emit(StageId::JsScan, resp);
         }
     }
 }
@@ -82,11 +83,14 @@ fn extract_source_maps(content: &[u8]) -> Vec<(String, String)> {
             if let (Some(name), Some(content)) = (sm.get_source(i), sm.get_source_contents(i)) {
                 result.push((
                     format!(
-                        "/sourcemap{}",
+                        "/sourcemap/{}",
                         name.replace("webpack://", "")
                             .replace("webpack:/", "")
+                            .replace("..", "")
                             .replace(":", "")
                             .replace("//", "/")
+                            .strip_prefix('/')
+                            .unwrap_or(&name)
                     ),
                     content.to_string(),
                 ));

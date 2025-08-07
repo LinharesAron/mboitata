@@ -1,6 +1,6 @@
 use std::sync::{atomic::{AtomicUsize, Ordering}, Arc};
 use tokio::sync::{broadcast, mpsc::UnboundedSender, Notify};
-use crate::stages::{intercepted::InterceptedResponse, stage::StageId};
+use crate::analyzer::{intercepted::InterceptedResponse, stage::StageId};
 
 
 pub struct Event {

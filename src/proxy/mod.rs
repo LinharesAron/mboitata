@@ -22,7 +22,7 @@ use tokio::{
 
 use crate::proxy::http::HttpIntercept;
 use crate::proxy::https::HttpsIntercept;
-use crate::{proxy::certs::CertificateManager, stages::intercepted::InterceptedResponse};
+use crate::{proxy::certs::CertificateManager, analyzer::intercepted::InterceptedResponse};
 
 type ClientBuilder = hyper::client::conn::http1::Builder;
 type ServerBuilder = hyper::server::conn::http1::Builder;
