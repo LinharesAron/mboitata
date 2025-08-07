@@ -4,7 +4,7 @@ use regex::Regex;
 use reqwest::Client;
 use sourcemap::{DecodedMap, decode_slice};
 
-use crate::stages::{
+use crate::analyzer::{
     event::Dispatcher,
     intercepted::InterceptedResponse,
     stage::{Stage, StageId},
@@ -69,7 +69,8 @@ impl Stage for MapStage {
             }
 
             dispatcher.emit(StageId::SaveFile, resp.clone());
-            dispatcher.emit(StageId::Scan, resp);
+            dispatcher.emit(StageId::Scan, resp.clone());
+            dispatcher.emit(StageId::JsScan, resp);
         }
     }
 }

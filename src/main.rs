@@ -3,7 +3,7 @@ mod config;
 mod consumer;
 mod navigator;
 mod proxy;
-mod stages;
+mod analyzer;
 
 use std::fs;
 use std::path::Path;
@@ -15,13 +15,13 @@ use tokio::sync::{broadcast, mpsc};
 
 use std::future::Future;
 
-use crate::stages::intercepted::InterceptedResponse;
+use crate::analyzer::intercepted::InterceptedResponse;
 use crate::{
     proxy::{
         certs::{CertificateManager, create_ca_certificate},
         start_proxy,
     },
-    stages::setup::initialize_stages,
+    analyzer::setup::initialize_stages,
 };
 
 #[tokio::main]
@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
     let (tx, rx) = mpsc::channel::<InterceptedResponse>(1000);
     let (kill, _): (broadcast::Sender<()>, broadcast::Receiver<()>) = broadcast::channel(1);
 
-    let cert_dir = config.certs_dir;
+    let cert_dir = config.get_certs_dir();
     if !cert_dir.exists() {
         fs::create_dir_all(&cert_dir)?;
     }

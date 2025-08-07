@@ -21,14 +21,28 @@ pub struct Config {
     #[arg(short, long, env = "MBOITATA_OUTPUT", default_value = "output")]
     pub output: PathBuf,
 
-    #[arg(short, long, env = "MBOITATA_CERTS", default_value = "certs")]
-    pub certs_dir: PathBuf,
+    #[arg(short, long, env = "MBOITATA_CERTS")]
+    pub certs_dir: Option<String>,
 
     #[arg(long, default_value_t = false)]
     pub pretty: bool,
 
     #[arg(long, env = "MB_ALLOWLIST", value_delimiter = ',')]
     pub allow_list: Vec<String>,
+}
+
+impl Config {
+    pub fn get_certs_dir(&self) -> PathBuf {
+        match self.certs_dir.clone() {
+            Some(s) => PathBuf::from(s),
+            None => {
+                match dirs::home_dir() {
+                    Some(home) => home.join(".mboitata/certs"),
+                    None => PathBuf::from("./certs")
+                }
+            }
+        }
+    }
 }
 
 pub fn load() -> (Config, AllowList) {

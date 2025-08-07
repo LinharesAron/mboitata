@@ -9,7 +9,7 @@ use tokio::{net::TcpStream, sync::mpsc::Sender};
 
 use crate::{
     proxy::{Intercept, empty, extract_host_port, handle_response, https::HttpsIntercept},
-    stages::intercepted::InterceptedResponse,
+    analyzer::intercepted::InterceptedResponse,
 };
 
 #[derive(Debug, Clone)]

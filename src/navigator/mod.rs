@@ -1,8 +1,16 @@
-use headless_chrome::{Browser, LaunchOptionsBuilder};
+use headless_chrome::{Browser, LaunchOptionsBuilder, Tab};
 use std::time::Duration;
-use tokio::{sync::broadcast, task::{self, JoinError}};
+use tokio::{
+    sync::broadcast,
+    task::{self, JoinError}, time::Instant,
+};
 
-pub async fn run(urls: Vec<String>, workers: usize, proxy: String, kill_sign: broadcast::Sender<()>) {
+pub async fn run(
+    urls: Vec<String>,
+    workers: usize,
+    proxy: String,
+    kill_sign: broadcast::Sender<()>,
+) {
     println!("🕐 Esperando proxy ficar pronto...");
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
@@ -34,6 +42,7 @@ async fn navigate_block(urls: Vec<String>, id: usize, proxy: String) -> Result<(
             .headless(true)
             .proxy_server(Some(proxy.as_str()))
             .ignore_certificate_errors(true)
+            .sandbox(false)
             .build()
             .unwrap();
 
@@ -59,11 +68,57 @@ async fn navigate_block(urls: Vec<String>, id: usize, proxy: String) -> Result<(
                 eprintln!("❌ Worker {id} falhou ao navegar: {e}");
                 continue;
             }
-            let _ = tab.wait_for_element("body");
-            std::thread::sleep(Duration::from_secs(2));
+
+            if let Err(e) = wait_until_navigated_with_timeout(&tab, Duration::from_secs(15)) {
+                eprintln!("⏱️ Worker {id} timeout ao esperar carregamento: {e}");
+                continue;
+            }
+
+            if let Err(e) = wait_for_element_with_timeout(&tab, "body", Duration::from_secs(10)) {
+                eprintln!("⚠️ Worker {id} body não apareceu: {e}");
+                continue;
+            }
+
+            println!("✅ Worker {id} página carregada: {url}");
+            std::thread::sleep(Duration::from_secs(3));
         }
 
         println!("✅ Worker {id} apagou sua chama com sucesso.");
     })
     .await
+}
+
+fn wait_until_navigated_with_timeout(tab: &Tab, timeout: Duration) -> Result<(), String> {
+    let start = Instant::now();
+    while start.elapsed() < timeout {
+        match tab.wait_until_navigated() {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                if start.elapsed() >= timeout {
+                    return Err(format!("timeout: {e}"));
+                }
+                std::thread::sleep(Duration::from_millis(500));
+            }
+        }
+    }
+    Err("timeout atingido".into())
+}
+
+fn wait_for_element_with_timeout(
+    tab: &Tab,
+    selector: &str,
+    timeout: Duration,
+) -> Result<(), String> {
+    let start = Instant::now();
+    while start.elapsed() < timeout {
+        match tab.wait_for_element_with_custom_timeout(selector, Duration::from_secs(2)) {
+            Ok(_) => return Ok(()),
+            Err(_) => {
+                if start.elapsed() >= timeout {
+                    return Err(format!("Elemento '{selector}' não encontrado"));
+                }
+            }
+        }
+    }
+    Err(format!("timeout: elemento '{selector}'"))
 }
